@@ -1,0 +1,52 @@
+// -------------------------------------------------------
+// Use Macros ("constants" or "set-once variables") in CSS
+// -------------------------------------------------------
+
+This JavaScript library lets you use macros in your CSS
+files, using the following CSS-accepted syntax:
+
+  @macros {
+    macro_1: value_1;
+    macro_2: value_2;
+    macro_3: value_3;
+    macro_4: value_4;
+  }
+
+  element {
+    some-property: macro_1
+  }
+
+  .class {
+    some-property: macro_2;
+  }
+
+  #id {
+    some-property: macro_3;
+  }
+
+  *:pseudo-class {
+    some-property: macro_4;
+  }
+
+Browsers that don't support JavaScript stylesheet
+manipulation, as well as browsers that have scripts
+disabled, will load CSS files that use macros just
+fine, but will ignore any rule that uses a macro
+as property value, so things don't break in older
+browsers, but you will need to declare fallback
+rules (preceding the macro override) for any rule
+that should have some specific value when there is no
+javascript available (much like how we design modern
+web pages already anyway).
+
+A demonstrator page for this can be found at:
+
+  http://pomax.nihongoresources.com/pages/CSSmacros
+
+// -------------------------------------------
+
+(c) Mike "Pomax" Kamermans
+
+you may use this however you like, including
+commercially, although a link to the github
+project page would be appreciated.
