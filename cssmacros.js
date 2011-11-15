@@ -15,6 +15,10 @@ if (!StyleSheetList) { StyleSheetList = {}; }
 */
 
 (function () {
+  // if this date-time is after whatever version you're
+  // using, it's newer, and you'll want to update =)
+  var VERSION = "2011-11-14.21.26";
+
   // good to have lying around
   var undef;
   var noop = function () {};
