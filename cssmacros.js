@@ -17,7 +17,7 @@ if (!StyleSheetList) { StyleSheetList = {}; }
 (function () {
   // if this date-time is after whatever version you're
   // using, it's newer, and you'll want to update =)
-  var VERSION = "2011-11-14.21.51";
+  var VERSION = "2011-11-14.22.01";
 
   // good to have lying around
   var undef;
@@ -94,7 +94,7 @@ if (!StyleSheetList) { StyleSheetList = {}; }
         }
       }
 
-      if (!inquote1 && !inquote2 && !incomment && chr === "/" && data[i + 1] === "*") {
+      if (!inquote1 && !inquote2 && !incomment && chr === "/" && i + 1 < e && data[i + 1] === "*") {
         incomment = true;
       } else if (!inquote1 && !inquote2 && incomment && chr === "*" && i + 1 < e && data[i + 1] === "/") {
         incomment = false;
