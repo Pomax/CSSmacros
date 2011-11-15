@@ -9,8 +9,10 @@
 
 // these are here mainly to appease JSLint, which
 // doesn't know about the W3C CSS DOM API
+/*
 if (!CSSStyleSheet) { CSSStyleSheet = {}; }
 if (!StyleSheetList) { StyleSheetList = {}; }
+*/
 
 (function () {
   // good to have lying around
@@ -66,6 +68,44 @@ if (!StyleSheetList) { StyleSheetList = {}; }
   };
 
   /**
+   * Strip comments from a string.
+   */
+  var stripComments = function (data) {
+    var i, e, chr,
+      inquote1 = false,
+      inquote2 = false,
+      incomment = false,
+      rewritten = "";
+    for (i = 0, e = data.length; i < e; i++) {
+      chr = data[i];
+      if (!incomment) {
+        if (!inquote1 && !inquote2 && chr === "'") {
+          inquote1 = true;
+        } else if (!inquote1 && !inquote2 && chr === '"') {
+          inquote2 = true;
+        } else if (inquote1 && chr === "'") {
+          inquote1 = false;
+        } else if (inquote2 && chr === '"') {
+          inquote2 = false;
+        }
+      }
+
+      if (!inquote1 && !inquote2 && !incomment && chr === "/" && data[i + 1] === "*") {
+        incomment = true;
+      } else if (!inquote1 && !inquote2 && incomment && chr === "*" && i + 1 < e && data[i + 1] === "/") {
+        incomment = false;
+        i += 1; // we need to skip the "/" in the "*/" pair
+        continue;
+      }
+
+      if (!incomment) {
+        rewritten += chr;
+      }
+    }
+    return rewritten;
+  };
+
+  /**
    * If {data} contains a macro definition (@macro { ... }),
    * extract the macros, and then apply them to the data body.
    */
@@ -76,8 +116,8 @@ if (!StyleSheetList) { StyleSheetList = {}; }
     newdata = newdata.replace(/\n/g, "");
     newdata = newdata.replace(/\}.*/, "").substring(newdata.indexOf("{") + 1);
     declarations = newdata.split(";");
-    // step two: get everything after macro block
-    legalcss = data.substring(data.indexOf("}") + 1);
+    // step two: get everything after macro block, stripped of comments
+    legalcss = stripComments(data.substring(data.indexOf("}") + 1));
     // step three: get the individual macros
     for (i = 0, e = declarations.length; i < e; i++) {
       line = declarations[i];
@@ -154,7 +194,7 @@ if (!StyleSheetList) { StyleSheetList = {}; }
     var i, e, binding, sheet, macros, csstext;
     for (i = 0, e = bindings.length; i < e; i++) {
       binding = bindings[i];
-      if(binding.sheet && binding.csstext && binding.macros) {
+      if (binding.sheet && binding.csstext && binding.macros) {
         sheet = binding.sheet;
         csstext = binding.csstext;
         macros = binding.macros;
@@ -172,7 +212,8 @@ if (!StyleSheetList) { StyleSheetList = {}; }
   var processStylesheetMacros = function () {
     var sheet,
       styles = document.styleSheets,
-      i, e,
+      i,
+      e,
       macros,
       csstext,
       result;
@@ -184,7 +225,9 @@ if (!StyleSheetList) { StyleSheetList = {}; }
       sheet = styles[i];
       if (sheet instanceof CSSStyleSheet) {
         result = processStyleSheet(sheet);
-        if(!result) { continue; }
+        if (!result) {
+          continue;
+        }
         macros = result.macros;
         csstext = result.csstext;
         bindings.push({sheet: sheet, macros: macros, csstext: csstext});
