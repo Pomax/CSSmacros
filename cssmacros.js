@@ -17,7 +17,7 @@ if (!StyleSheetList) { StyleSheetList = {}; }
 (function () {
   // if this date-time is after whatever version you're
   // using, it's newer, and you'll want to update =)
-  var VERSION = "2011-11-14.21.26";
+  var VERSION = "2011-11-14.21.51";
 
   // good to have lying around
   var undef;
@@ -119,6 +119,7 @@ if (!StyleSheetList) { StyleSheetList = {}; }
     newdata = data.replace(/\r/g, "");
     newdata = newdata.replace(/\n/g, "");
     newdata = newdata.replace(/\}.*/, "").substring(newdata.indexOf("{") + 1);
+    newdata = stripComments(newdata);
     declarations = newdata.split(";");
     // step two: get everything after macro block, stripped of comments
     legalcss = stripComments(data.substring(data.indexOf("}") + 1));
