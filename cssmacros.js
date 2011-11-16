@@ -9,9 +9,11 @@
 
 // these are here mainly to appease JSLint, which
 // doesn't know about the W3C CSS DOM API
+
 /*
 if (!CSSStyleSheet) { CSSStyleSheet = {}; }
 if (!StyleSheetList) { StyleSheetList = {}; }
+if (!jQuery) { jQuery = {}; }
 */
 
 (function () {
@@ -332,6 +334,60 @@ if (!StyleSheetList) { StyleSheetList = {}; }
           return sheet.getMacro(macro);
         }
       }
+    };
+  }
+
+  // ================================
+  // Let's extend jQuery if it exists
+  // ================================
+
+  if (jQuery) {
+    jQuery.fn.macro = function (macro, value) {
+      // helper function: get the relevant CSSStyleSheet object
+      var getSheet = function (link) {
+        if (link.nodeName.toLowerCase() === "link") {
+          var href = link.href, i = 0, sheets = document.styleSheets, e = sheets.length, sheet;
+          for (i = 0; i < e; i++) {
+            sheet = sheets[i];
+            if (sheet.href === href) {
+              return sheet;
+            }
+          }
+        }
+        return false;
+      };
+      // setter function definition
+      var setMacro = function (link, macro, value) {
+        if (link.nodeName.toLowerCase() === "link") {
+          var sheet = getSheet(link);
+          if (sheet) {
+            sheet.setMacro(macro, value);
+          }
+        }
+      };
+      // getter function definition
+      var getMacro = function (macro) {
+        if (this.nodeName.toLowerCase() === "link") {
+          var sheet = getSheet(this);
+          if (sheet) {
+            return sheet.getMacro(macro);
+          }
+        }
+        return false;
+      };
+      // are we being asked for a macro's value? Find the first instance, or null if !exist.
+      if (value === undef) {
+        var i, e;
+        for (i = 0, e = this.length; i < e; i++) {
+          value = getSheet(this[i]).getMacro(macro);
+          if (value) {
+            return value;
+          }
+        }
+        return null;
+      }
+      // no, we're being asked to set it. Set for all, then return a jQuery set.
+      return this.each(function () { setMacro(this, macro, value); });
     };
   }
 
