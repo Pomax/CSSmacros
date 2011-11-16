@@ -39,7 +39,27 @@ that should have some specific value when there is no
 javascript available (much like how we design modern
 web pages already anyway).
 
-A demonstrator page for this can be found at:
+Obvious, changing macro values on the fly using
+JavaScript is supported. There are new functions
+on the DOM (specifically, on the CSSStyleSheet and
+StyleSheetList objects) as well as for jQuery.
+
+DOM API:
+
+  document.styleSheets[n].getMacro("some-property");
+  document.styleSheets[n].setMacro("some-property","new value");
+  document.styleSheets.setMacro("style.css", "some-property","new value");
+  document.styleSheets.setMacroForAll("some-property","new value");
+
+jQuery API:
+
+  var value = $('list').macro("some-property");
+  var value = $('list[href="style.css"]').macro("some-property");
+  $('list').macro("some-property","new value");
+  $('list[href="style.css"]').macro("some-property", "new value");
+
+A demonstrator page with a more elaborate explanation
+for this project can be found at:
 
   http://pomax.nihongoresources.com/pages/CSSmacros
 
