@@ -41,22 +41,19 @@ if (!jQuery) { jQuery = {}; }
    */
   var setRulesForSheet = function (child, rules) {
     // record the sheet size prior to new rule insertion
-    var offset = child.length;
+    if(child.cssRules) {
+      var cssRules = child.cssRules,
+          offset = 0;
 
-    // insert the new rules, at the end of the stylesheet
-    var r, e, ruleCount = child.cssRules.length, rule, result;
-    for (r = 0, e = rules.length; r < e; r++) {
-      rule = rules[r];
-      if (rule.trim() === "") { continue; }
-      rule = rule.replace(/\n/g, '').replace(/\n/g, '');
-      result = child.insertRule(rule, ruleCount + r);
-    }
-
-    // Then we clean up by removing the old rules.
-    // we could leave them in, because the new rules
-    // "overrule" them, but it's better to remove them.
-    while (offset-- >= 0) {
-      child.removeRule(0);
+      // replace any rules that require modification
+      var r, e, ruleCount = cssRules.length, rule, result;
+      for (r = rules.length-1; r>=0; r--) {
+        rule = rules[r];
+        if (rule.trim() === "") { continue; }
+        rule = rule.replace(/\n/g, '').replace(/\n/g, '');
+        child.removeRule(r);
+        child.insertRule(rule, r);
+      }
     }
   };
 
@@ -183,13 +180,22 @@ if (!jQuery) { jQuery = {}; }
     // we did not. Perform full replacement
     var macros = {},
       csstext = "";
-    var xhr = new XMLHttpRequest();
-    xhr.open('GET', sheet.href, false);
-    xhr.send(null);
-    if (xhr.status === 200) {
-      var result = replaceCSSMacros(sheet, xhr.responseText);
-      csstext = result.csstext;
-      macros = result.macros;
+
+    // from file
+    if(sheet.href && sheet.href !== "") {
+      var xhr = new XMLHttpRequest();
+      xhr.open('GET', sheet.href, false);
+      xhr.send(null);
+      if (xhr.status === 200) {
+        var result = replaceCSSMacros(sheet, xhr.responseText);
+        csstext = result.csstext;
+        macros = result.macros;
+      }
+    }
+    // inline style
+    else {
+      // TODO: implement
+      return false;
     }
     return {macros: macros, csstext: csstext};
   };
