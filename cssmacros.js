@@ -19,7 +19,7 @@ if (!jQuery) { jQuery = {}; }
 (function () {
   // if this date-time is after whatever version you're
   // using, it's newer, and you'll want to update =)
-  var VERSION = "2011-12-12.12.47";
+  var VERSION = "2011-12-12.15.55";
 
   // good to have lying around
   var undef;
@@ -100,11 +100,17 @@ if (!jQuery) { jQuery = {}; }
    * Update a macros object with additional or override entries.
    */
   var mergeMacros = function (macros, updates) {
-    var a;
-    for (macro in updates) {
-      macros[macro] = updates[macro];
+    var a, newmacros={};
+    // copy all global macros
+    for (macro in macros ) {
+      newmacros[macro] = macros[macro];
     }
-    return macros;
+    // copy all local macros
+    for (macro in updates) {
+      newmacros[macro] = updates[macro];
+    }
+    // return total to-replace macro list
+    return newmacros;
   };
 
   /**
@@ -122,12 +128,6 @@ if (!jQuery) { jQuery = {}; }
   var cssReplace = function (cssstring, macros) {
     if(cssstring.trim()==="") return "";
     var macro;
-    // first, globals
-    var globals = document.styleSheets.globalCSSmacros;
-    for(macro in globals) {
-      cssstring = replaceMacro(cssstring, macro, globals[macro]);
-    }
-    // then, local (including local overwrites)
     for (macro in macros) {
       cssstring = replaceMacro(cssstring, macro, macros[macro]);
     }
@@ -146,6 +146,8 @@ if (!jQuery) { jQuery = {}; }
     newdata = newdata.replace(/\}.*/, "").substring(newdata.indexOf("{") + 1);
     newdata = stripComments(newdata);
     declarations = newdata.split(";");
+    // FIXME: this will simply remove the first block
+    legalcss = stripComments(data.substring(data.indexOf("}") + 1));
     // step two: get the individual macros
     for (i = 0, e = declarations.length; i < e; i++) {
       line = declarations[i];
@@ -155,6 +157,7 @@ if (!jQuery) { jQuery = {}; }
       value = line[1].trim();
       document.styleSheets.globalCSSmacros[macro] = value;
     }
+    return legalcss;
   }
 
   /**
@@ -162,30 +165,35 @@ if (!jQuery) { jQuery = {}; }
    * extract the macros, and then apply them to the data body.
    */
   var replaceMacrosInCSSText = function (data) {
-    var newdata, declarations, i, e, macro, macros = {}, value, legalcss, line;
-    // step one: get the macro block
-    newdata = data.replace(/\r/g, "");
-    newdata = newdata.replace(/\n/g, "");
-    newdata = newdata.substring(newdata.indexOf("@macros")+7);
-    newdata = newdata.replace(/\}.*/, "").substring(newdata.indexOf("{") + 1);
-    newdata = stripComments(newdata);
-    declarations = newdata.split(";");
-    // step two: get everything after macro block, stripped of comments
-    legalcss = stripComments(data.substring(data.indexOf("}") + 1));
-    // step three: get the individual macros
-    for (i = 0, e = declarations.length; i < e; i++) {
-      line = declarations[i];
-      if (line.indexOf(":") < 0) { continue; }
-      line = line.split(":");
-      macro = line[0].trim();
-      value = line[1].trim();
-      macros[macro] = value;
+    var newdata="", declarations, i, e, macro, macros = {}, value, legalcss=data, line, cssrules=false;
+
+    if(data.indexOf("@macros")>=0) {
+      // step one: get the macro block
+      newdata = data.replace(/\r/g, "");
+      newdata = newdata.replace(/\n/g, "");
+      newdata = newdata.substring(newdata.indexOf("@macros")+7);
+      newdata = newdata.replace(/\}.*/, "").substring(newdata.indexOf("{") + 1);
+      newdata = stripComments(newdata);
+      declarations = newdata.split(";");
+      // step two: get everything after macro block, stripped of comments
+      // FIXME: this will simply remove the first block
+      legalcss = stripComments(data.substring(data.indexOf("}") + 1));
+      // step three: get the individual macros
+      for (i = 0, e = declarations.length; i < e; i++) {
+        line = declarations[i];
+        if (line.indexOf(":") < 0) { continue; }
+        line = line.split(":");
+        macro = line[0].trim();
+        value = line[1].trim();
+        macros[macro] = value;
+      }
+      // step four: perform macro replacement
+      newdata = cssReplace(legalcss, macros);
+      // step five: split real CSS text into individual rules and return
+      newdata = newdata.replace(new RegExp("}", "g"), "}¤");
+      cssrules = newdata.split("¤");
     }
-    // step four: perform macro replacement
-    newdata = cssReplace(legalcss, macros);
-    // step five: split real CSS text into individual rules and return
-    newdata = newdata.replace(new RegExp("}", "g"), "}¤");
-    var cssrules = newdata.split("¤");
+
     return {rules: cssrules, csstext: legalcss, macros: macros};
   };
 
@@ -202,15 +210,19 @@ if (!jQuery) { jQuery = {}; }
 
     // are there any global macros declarations?
     if (hasGlobals) {
-      processGlobalMacros(css_text);
-      macros = document.styleSheets.globalCSSmacros;
+      css_text = processGlobalMacros(css_text);
     }
 
-    // regardless of globals, perform regular macro replacement.
+    // start with whatever the global macros are at this point
+    macros = document.styleSheets.globalCSSmacros;
+
+    // then perform macro replacement, which will grow the macros
+    // list if local macros are declared as well.
     var replacement = replaceMacrosInCSSText(css_text),
       rules = replacement.rules,
       csstext = replacement.csstext,
       macros = mergeMacros(macros, replacement.macros);
+
     if (rules !== false) {
       // this replaces the current (possibly broken due to macros)
       // rules with macro-replaced (valid) rules.
@@ -262,8 +274,8 @@ if (!jQuery) { jQuery = {}; }
    * Bind data so that it's still there after we finish
    */
   var bindData = function () {
-    var i, e, binding, sheet, macros, macro, csstext;
-    for (i = 0, e = bindings.length; i < e; i++) {
+    var i, e=bindings.length, binding, sheet, macros, macro, csstext;
+    for (i = 0; i < e; i++) {
       binding = bindings[i];
       if (binding.sheet && binding.csstext && binding.macros) {
         sheet = binding.sheet;
@@ -271,6 +283,7 @@ if (!jQuery) { jQuery = {}; }
         sheet.setCSSText(csstext);
         macros = binding.macros;
         sheet.setMacros(macros);
+        processStyleSheet(sheet);
       }
     }
   };
@@ -289,6 +302,7 @@ if (!jQuery) { jQuery = {}; }
       csstext,
       result;
 
+    // add a global CSS macros container to the stylesheet list
     if(!StyleSheetList.prototype.globalCSSmacros) {
       StyleSheetList.prototype.globalCSSmacros = {};
     }
@@ -439,9 +453,11 @@ if (!jQuery) { jQuery = {}; }
       };
       // are we being asked for a macro's value? Find the first instance, or null if !exist.
       if (value === undef) {
-        var i, e;
+        var i, e, sheet;
         for (i = 0, e = this.length; i < e; i++) {
-          value = getSheet(this[i]).getMacro(macro);
+          sheet = getSheet(this[i]);
+          if(!sheet) continue;
+          value = sheet.getMacro(macro);
           if (value) {
             return value;
           }
