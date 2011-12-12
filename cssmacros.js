@@ -19,7 +19,7 @@ if (!jQuery) { jQuery = {}; }
 (function () {
   // if this date-time is after whatever version you're
   // using, it's newer, and you'll want to update =)
-  var VERSION = "2011-11-14.22.01";
+  var VERSION = "2011-12-12.12.47";
 
   // good to have lying around
   var undef;
@@ -31,47 +31,8 @@ if (!jQuery) { jQuery = {}; }
   log = function(string) { window.console.log(string); }
 */
 
-  // administrative cache, for deferred CSSStyleSheet property setting
-  var bindings = [];
-
   /**
-   * Clear a sheet, and inject the rules based on
-   * whatever the macros indicate should be the
-   * replacement text.
-   */
-  var setRulesForSheet = function (child, rules) {
-    // record the sheet size prior to new rule insertion
-    if(child.cssRules) {
-      var cssRules = child.cssRules,
-          offset = 0;
-
-      // replace any rules that require modification
-      var r, e, ruleCount = cssRules.length, rule, result;
-      for (r = rules.length-1; r>=0; r--) {
-        rule = rules[r];
-        if (rule.trim() === "") { continue; }
-        rule = rule.replace(/\n/g, '').replace(/\n/g, '');
-        child.removeRule(r);
-        child.insertRule(rule, r);
-      }
-    }
-  };
-
-  /**
-   * Replace all macros in CSS (macros only apply to ": value")
-   */
-  var cssReplace = function (cssstring, macros) {
-    var macro;
-    for (macro in macros) {
-      var value = macros[macro];
-      var re = ":([\\w\\s]*)" + macro + "([\\w\\s]*);";
-      cssstring = cssstring.replace(new RegExp(re, "gi"), ":$1" + value + "$2;");
-    }
-    return cssstring;
-  };
-
-  /**
-   * Strip comments from a string.
+   * Helper function - strip comments from a string.
    */
   var stripComments = function (data) {
     var i, e, chr,
@@ -108,6 +69,94 @@ if (!jQuery) { jQuery = {}; }
     return rewritten;
   };
 
+  // administrative cache, for deferred CSSStyleSheet property setting
+  var bindings = [];
+
+  /**
+   * Clear a sheet, and inject the rules based on
+   * whatever the macros indicate should be the
+   * replacement text.
+   */
+  var setRulesForSheet = function (child, rules) {
+    // record the sheet size prior to new rule insertion
+    if(child.cssRules) {
+      var cssRules = child.cssRules,
+          offset = 0;
+
+      // replace any rules that require modification
+      var r, e, ruleCount = cssRules.length, rule, result;
+      for (r = rules.length-1; r>=0; r--) {
+        rule = rules[r];
+        if (rule.trim() === "") { continue; }
+        rule = rule.replace(/\n/g, '').replace(/\n/g, '');
+        if(child.deleteRule) { child.deleteRule(r); }
+        else { child.removeRule(r); }
+        child.insertRule(rule, r);
+      }
+    }
+  };
+
+  /**
+   * Update a macros object with additional or override entries.
+   */
+  var mergeMacros = function (macros, updates) {
+    var a;
+    for (macro in updates) {
+      macros[macro] = updates[macro];
+    }
+    return macros;
+  };
+
+  /**
+   * Replace all macro instances with the
+   * corresponding replacement value in a string.
+   */
+  var replaceMacro = function (text, macro, value) {
+    var re = ":([\\w\\s]*)" + macro + "([\\w\\s]*);";
+    return text.replace(new RegExp(re, "gi"), ":$1" + value + "$2;");
+  };
+
+  /**
+   * Replace all macros in CSS (macros only apply to ": value")
+   */
+  var cssReplace = function (cssstring, macros) {
+    if(cssstring.trim()==="") return "";
+    var macro;
+    // first, globals
+    var globals = document.styleSheets.globalCSSmacros;
+    for(macro in globals) {
+      cssstring = replaceMacro(cssstring, macro, globals[macro]);
+    }
+    // then, local (including local overwrites)
+    for (macro in macros) {
+      cssstring = replaceMacro(cssstring, macro, macros[macro]);
+    }
+    return cssstring;
+  };
+
+  /**
+   * Extract global macro rules.
+   */
+  var processGlobalMacros = function (data) {
+    var newdata, declarations, i, e, macro, macros = {}, value, legalcss, line;
+    // step one: get the macro block
+    newdata = data.replace(/\r/g, "");
+    newdata = newdata.replace(/\n/g, "");
+    newdata = newdata.substring(newdata.indexOf("@global-macros")+14);
+    newdata = newdata.replace(/\}.*/, "").substring(newdata.indexOf("{") + 1);
+    newdata = stripComments(newdata);
+    declarations = newdata.split(";");
+    // step two: get the individual macros
+    for (i = 0, e = declarations.length; i < e; i++) {
+      line = declarations[i];
+      if (line.indexOf(":") < 0) { continue; }
+      line = line.split(":");
+      macro = line[0].trim();
+      value = line[1].trim();
+      document.styleSheets.globalCSSmacros[macro] = value;
+    }
+  }
+
   /**
    * If {data} contains a macro definition (@macro { ... }),
    * extract the macros, and then apply them to the data body.
@@ -117,6 +166,7 @@ if (!jQuery) { jQuery = {}; }
     // step one: get the macro block
     newdata = data.replace(/\r/g, "");
     newdata = newdata.replace(/\n/g, "");
+    newdata = newdata.substring(newdata.indexOf("@macros")+7);
     newdata = newdata.replace(/\}.*/, "").substring(newdata.indexOf("{") + 1);
     newdata = stripComments(newdata);
     declarations = newdata.split(";");
@@ -145,17 +195,25 @@ if (!jQuery) { jQuery = {}; }
    */
   var replaceCSSMacros = function (sheet, css_text) {
     // are there any macros to work with? if not, don't do anything
-    if (css_text.toLowerCase().indexOf("@macros") < 0) {
-      return false;
+    var lc = css_text.toLowerCase()
+        hasMacros = lc.indexOf("@macros") >= 0;
+        hasGlobals = lc.indexOf("@global-macros") >= 0,
+        macros = {};
+
+    // are there any global macros declarations?
+    if (hasGlobals) {
+      processGlobalMacros(css_text);
+      macros = document.styleSheets.globalCSSmacros;
     }
-    // there are. perform macro replacement
+
+    // regardless of globals, perform regular macro replacement.
     var replacement = replaceMacrosInCSSText(css_text),
       rules = replacement.rules,
       csstext = replacement.csstext,
-      macros = replacement.macros;
+      macros = mergeMacros(macros, replacement.macros);
     if (rules !== false) {
-      // this replaces the current (broken due to macros)
-      // rules with the rewritten (valid) rules, in situ.
+      // this replaces the current (possibly broken due to macros)
+      // rules with macro-replaced (valid) rules.
       setRulesForSheet(sheet, rules);
     }
     return {csstext: csstext, macros: macros};
@@ -204,14 +262,14 @@ if (!jQuery) { jQuery = {}; }
    * Bind data so that it's still there after we finish
    */
   var bindData = function () {
-    var i, e, binding, sheet, macros, csstext;
+    var i, e, binding, sheet, macros, macro, csstext;
     for (i = 0, e = bindings.length; i < e; i++) {
       binding = bindings[i];
       if (binding.sheet && binding.csstext && binding.macros) {
         sheet = binding.sheet;
         csstext = binding.csstext;
-        macros = binding.macros;
         sheet.setCSSText(csstext);
+        macros = binding.macros;
         sheet.setMacros(macros);
       }
     }
@@ -231,6 +289,10 @@ if (!jQuery) { jQuery = {}; }
       csstext,
       result;
 
+    if(!StyleSheetList.prototype.globalCSSmacros) {
+      StyleSheetList.prototype.globalCSSmacros = {};
+    }
+
     // loop through all stylesheets to see if they need replacing
     for (i = 0, e = styles.length; i < e; i++) {
       macros = {};
@@ -246,8 +308,7 @@ if (!jQuery) { jQuery = {}; }
         bindings.push({sheet: sheet, macros: macros, csstext: csstext});
       }
     }
-    // bind values in a separate thread, to escape closure optimisation
-    // throwing away data being bound to a CSSStyleSheet object
+    // after aggregating all data, bind it.
     bindData();
   };
 
@@ -292,11 +353,6 @@ if (!jQuery) { jQuery = {}; }
     CSSStyleSheet.prototype.getMacro = function (macro) {
       return this.macros[macro];
     };
-  }
-
-  // Browsers that don't support removeRule require shimming
-  if (CSSStyleSheet.prototype.deleteRule && CSSStyleSheet.prototype.removeRule === undef) {
-    CSSStyleSheet.prototype.removeRule = CSSStyleSheet.prototype.deleteRule;
   }
 
   // ============================
