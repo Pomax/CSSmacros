@@ -28,6 +28,20 @@ files, using the following CSS-accepted syntax:
     some-property: macro_4;
   }
 
+Global macros for cross-stylesheet designs
+are also supported:
+
+  @global-macros {
+    macro_1: value_1;
+    macro_2: value_2;
+    macro_3: value_3;
+    ...
+  }
+
+These can be declared in any stylesheet and will
+apply to all stylesheets that exist when the
+DOMContentLoaded event fires.
+
 Browsers that don't support JavaScript stylesheet
 manipulation, as well as browsers that have scripts
 disabled, will load CSS files that use macros just
